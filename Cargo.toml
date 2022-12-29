@@ -9,8 +9,9 @@ edition = "2021"
 default = []
 serde = ["dep:serde"]
 
-[dependencies]
-inertia-algebra = { path = "../inertia-algebra", version="0.1" }
+[dependencies.inertia-algebra]
+path = "../inertia-algebra"
+version = "0.1"
 
 [dependencies.serde]
 optional = true

@@ -22,8 +22,6 @@
 use crate::poly::*;
 
 use inertia_algebra::*;
-use inertia_algebra::structures::*;
-use inertia_algebra::properties::*;
 
 use std::cell::RefCell;
 use std::fmt;

@@ -23,8 +23,6 @@ mod ops;
 use crate::New;
 
 use inertia_algebra::*;
-use inertia_algebra::structures::*;
-use inertia_algebra::properties::*;
 
 use std::fmt;
 use std::hash::{Hash, Hasher};
