@@ -15,25 +15,80 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-mod generic;
-pub use generic::{GenericMatSpace, GenericMat};
+pub mod generic;
+mod ops;
 
-use inertia_traits::*;
-use inertia_traits::ops::*;
+use crate::New;
+use inertia_algebra::*;
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use std::ops::*;
 
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
+
+pub trait IntoMatSpace: Ring + Sized {
+    type Inner: MatrixSpace<Self>; 
+}
+
+pub type InnerMatSpace<T> = <T as IntoMatSpace>::Inner;
+pub type InnerMat<T> = <InnerMatSpace<T> as MatrixSpace<T>>::Element;
+
+pub trait MatrixSpace<T: Ring>:
+    AdditiveGroupAbelian<Element=<Self as MatrixSpace<T>>::Element>
+{
+    type Element: MatrixSpaceElement<T, Parent=Self>;
+
+    fn init<D: Into<u64>>(ring: &T, nrows: D, ncols: D) -> Self;
+
+    /// Return a reference to the base ring.
+    fn base_ring(&self) -> &T;
+
+    fn nrows(&self) -> usize;
+
+    fn ncols(&self) -> usize;
+
+    #[inline]
+    fn is_generic(&self) -> bool {
+        false
+    }
+}
+
+pub trait MatrixSpaceElement<T: Ring>:
+    AdditiveGroupAbelianElement<Parent=<Self as MatrixSpaceElement<T>>::Parent>
+{
+    type Parent: MatrixSpace<T, Element=Self>;
+
+    //type BorrowCoeff<'a>: Deref<Target=T>;
+    //type BorrowCoeffMut<'a>: DerefMut<Target=T>;
+    
+    /// Return a reference to the base ring.
+    fn base_ring(&self) -> &T;
+
+    fn len(&self) -> usize;
+    
+    fn nrows(&self) -> usize;
+
+    fn ncols(&self) -> usize;
+
+    fn get_entry(&self, i: usize, j: usize) -> Option<Elem<T>>;
+
+    fn set_entry(&mut self, i: usize, j: usize, entry: Elem<T>) -> Option<Elem<T>>;
+    
+    fn get_entries(&self) -> Vec<Elem<T>>;
+    
+    #[inline]
+    fn is_generic(&self) -> bool {
+        false
+    }
+}
 
 ///////////////////////////////////////////////////////////////////
 // MatSpace<T>
 ///////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct MatSpace<T: RingElement> {
+pub struct MatSpace<T: IntoMatSpace> {
     #[cfg_attr(
         feature = "serde",
         serde(bound(
@@ -44,7 +99,7 @@ pub struct MatSpace<T: RingElement> {
     pub(crate) inner: InnerMatSpace<T>,
 }
 
-impl<T: RingElement> MatSpace<T> {
+impl<T: IntoMatSpace> MatSpace<T> {
     #[inline]
     pub fn inner(&self) -> &InnerMatSpace<T> {
         &self.inner
@@ -59,16 +114,21 @@ impl<T: RingElement> MatSpace<T> {
     pub fn into_inner(self) -> InnerMatSpace<T> {
         self.inner
     }
+}
 
+impl<S, T: IntoMatSpace> New<S> for MatSpace<T>
+where
+    InnerMatSpace<T>: New<S>
+{
     #[inline]
-    pub fn infer(elem: T, nrows: u32, ncols: u32) -> Self {
-        MatSpace {
-            inner: InnerMatSpace::<T>::new(&elem.parent(), nrows, ncols),
+    fn new(&self, val: S) -> Mat<T> {
+        Mat {
+            inner: self.inner().new(val)
         }
     }
 }
 
-impl<T: RingElement> fmt::Display for MatSpace<T> where
+impl<T: IntoMatSpace> fmt::Display for MatSpace<T> where
     InnerMatSpace<T>: fmt::Display
 {
     #[inline]
@@ -77,9 +137,9 @@ impl<T: RingElement> fmt::Display for MatSpace<T> where
     }
 }
 
-impl<T: RingElement> Eq for MatSpace<T> where InnerMatSpace<T>: Eq {}
+impl<T: IntoMatSpace> Eq for MatSpace<T> where InnerMatSpace<T>: Eq {}
 
-impl<T: RingElement> PartialEq for MatSpace<T> 
+impl<T: IntoMatSpace> PartialEq for MatSpace<T> 
 where 
     InnerMatSpace<T>: PartialEq 
 {
@@ -89,7 +149,7 @@ where
     }
 }
 
-impl<T: RingElement> Hash for MatSpace<T> 
+impl<T: IntoMatSpace> Hash for MatSpace<T> 
 where
     InnerMatSpace<T>: Hash
 {
@@ -99,18 +159,27 @@ where
     }
 }
 
-impl<T: RingElement> Parent for MatSpace<T> {
+impl<T: IntoMatSpace> Parent for MatSpace<T> {
     type Element = Mat<T>;
+}
 
+impl<T: IntoMatSpace> Identity<Additive> for MatSpace<T> {
     #[inline]
-    fn default(&self) -> Self::Element {
+    fn identity(&self) -> Mat<T> {
         Mat {
-            inner: self.inner().default(),
+            inner: self.inner().zero()
         }
     }
 }
 
-impl<T: RingElement> MatrixSpace<T> for MatSpace<T> {
+impl<T: IntoMatSpace> Divisible<Additive> for MatSpace<T> {}
+
+impl<T: IntoMatSpace> Associative<Additive> for MatSpace<T> {}
+
+impl<T: IntoMatSpace> Commutative<Additive> for MatSpace<T> {}
+
+/*
+impl<T: IntoMatSpace> MatrixSpace<T> for MatSpace<T> {
     type Element = Mat<T>;
 
     #[inline]
@@ -140,14 +209,15 @@ impl<T: RingElement> MatrixSpace<T> for MatSpace<T> {
         self.inner().is_generic()
     }
 }
+*/
 
 ///////////////////////////////////////////////////////////////////
 // Mat<T>
 ///////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct Mat<T: RingElement> {
+pub struct Mat<T: IntoMatSpace> {
     #[cfg_attr(
         feature = "serde",
         serde(bound(
@@ -158,56 +228,7 @@ pub struct Mat<T: RingElement> {
     pub(crate) inner: InnerMat<T>,
 }
 
-impl<T: RingElement> fmt::Display for Mat<T>
-where
-    InnerMat<T>: fmt::Display,
-{
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner().fmt(f)
-    }
-}
-
-impl<T: RingElement> Eq for Mat<T> {}
-
-impl<S: RingElement, T: RingElement> PartialEq<Mat<S>> for Mat<T>
-where
-    InnerMat<T>: PartialEq<InnerMat<S>>,
-{
-    fn eq(&self, other: &Mat<S>) -> bool {
-        self.inner().eq(other.inner())
-    }
-}
-
-impl<S: RingElement, T: RingElement> PartialEq<&Mat<S>> for Mat<T>
-where
-    InnerMat<T>: PartialEq<InnerMat<S>>,
-{
-    fn eq(&self, other: &&Mat<S>) -> bool {
-        self.inner().eq(other.inner())
-    }
-}
-
-impl<S: RingElement, T: RingElement> PartialEq<Mat<S>> for &Mat<T>
-where
-    InnerMat<T>: PartialEq<InnerMat<S>>,
-{
-    fn eq(&self, other: &Mat<S>) -> bool {
-        self.inner().eq(other.inner())
-    }
-}
-
-impl<T: RingElement + Hash> Hash for Mat<T>
-where
-    InnerMat<T>: Hash,
-{
-    #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.inner().hash(state)
-    }
-}
-
-impl<T: RingElement> Mat<T> {
+impl<T: IntoMatSpace> Mat<T> {
     #[inline]
     pub fn inner(&self) -> &InnerMat<T> {
         &self.inner
@@ -224,7 +245,56 @@ impl<T: RingElement> Mat<T> {
     }
 }
 
-impl<T: RingElement> Element for Mat<T> {
+impl<T: IntoMatSpace> fmt::Display for Mat<T>
+where
+    InnerMat<T>: fmt::Display,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.inner().fmt(f)
+    }
+}
+
+impl<T: IntoMatSpace> Eq for Mat<T> {}
+
+impl<S: IntoMatSpace, T: IntoMatSpace> PartialEq<Mat<S>> for Mat<T>
+where
+    InnerMat<T>: PartialEq<InnerMat<S>>,
+{
+    fn eq(&self, other: &Mat<S>) -> bool {
+        self.inner().eq(other.inner())
+    }
+}
+
+impl<S: IntoMatSpace, T: IntoMatSpace> PartialEq<&Mat<S>> for Mat<T>
+where
+    InnerMat<T>: PartialEq<InnerMat<S>>,
+{
+    fn eq(&self, other: &&Mat<S>) -> bool {
+        self.inner().eq(other.inner())
+    }
+}
+
+impl<S: IntoMatSpace, T: IntoMatSpace> PartialEq<Mat<S>> for &Mat<T>
+where
+    InnerMat<T>: PartialEq<InnerMat<S>>,
+{
+    fn eq(&self, other: &Mat<S>) -> bool {
+        self.inner().eq(other.inner())
+    }
+}
+
+impl<T: IntoMatSpace + Hash> Hash for Mat<T>
+where
+    InnerMat<T>: Hash,
+{
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.inner().hash(state)
+    }
+}
+
+impl<T: IntoMatSpace> Element for Mat<T> {
     type Parent = MatSpace<T>;
 
     #[inline]
@@ -235,7 +305,33 @@ impl<T: RingElement> Element for Mat<T> {
     }
 }
 
-impl<T: RingElement> MatrixSpaceElement<T> for Mat<T> {
+impl<T: IntoMatSpace> Operation<Additive> for Mat<T> {
+    #[inline]
+    fn operate(&self, right: &Self) -> Self {
+        Mat {
+            inner: self.inner().op(Additive, right.inner())
+        }
+    }
+}
+
+impl<T: IntoMatSpace> IsIdentity<Additive> for Mat<T> {
+    #[inline]
+    fn is_identity(&self) -> bool {
+        self.inner().is_zero()
+    }
+}
+
+impl<T: IntoMatSpace> TwoSidedInverse<Additive> for Mat<T> {
+    #[inline]
+    fn two_sided_inverse(&self) -> Self {
+        Mat {
+            inner: self.inner().two_sided_inverse()
+        }
+    }
+}
+
+/*
+impl<T: IntoMatSpace> MatrixSpaceElement<T> for Mat<T> {
     type Parent = MatSpace<T>;
 
     #[inline]
@@ -293,63 +389,4 @@ impl<T: RingElement> MatrixSpaceElement<T> for Mat<T> {
         self.inner().is_generic()
     }
 }
-
-
-///////////////////////////////////////////////////////////////////
-// Coercion
-///////////////////////////////////////////////////////////////////
-
-impl<'a, S, T> Coerce<'a, S> for MatSpace<T> 
-where
-    T: RingElement,
-    InnerMatSpace<T>: Coerce<'a, S> 
-{
-    #[inline]
-    fn coerce(&self, value: S) -> Mat<T> {
-        Mat { inner: self.inner().coerce(value) }
-    }
-}
-
-///////////////////////////////////////////////////////////////////
-// Ops
-///////////////////////////////////////////////////////////////////
-
-derive_binop! {
-    Mat<T: RingElement>, InnerMat<T>;
-    Add, add
-    AddAssign, add_assign
-    AddFrom, add_from
-    AssignAdd, assign_add
-}
-
-derive_binop! {
-    Mat<T: RingElement>, InnerMat<T>;
-    Sub, sub
-    SubAssign, sub_assign
-    SubFrom, sub_from
-    AssignSub, assign_sub
-}
-
-derive_binop! {
-    Mat<T: RingElement>, InnerMat<T>;
-    Mul, mul
-    MulAssign, mul_assign
-    MulFrom, mul_from
-    AssignMul, assign_mul
-}
-
-derive_binop! {
-    Mat<T: RingElement>, InnerMat<T>;
-    Div, div
-    DivAssign, div_assign
-    DivFrom, div_from
-    AssignDiv, assign_div
-}
-
-derive_binop! {
-    Mat<T: RingElement>, InnerMat<T>;
-    Rem, rem
-    RemAssign, rem_assign
-    RemFrom, rem_from
-    AssignRem, assign_rem
-}
+*/

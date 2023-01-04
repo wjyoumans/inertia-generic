@@ -16,13 +16,8 @@
  */
 
 
-//use crate::Coerce;
-//use crate::structures::*;
-
 use crate::poly::*;
-
 use inertia_algebra::*;
-
 use std::cell::RefCell;
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -32,7 +27,6 @@ use std::rc::Rc;
 use serde::{Deserialize, Serialize};
 
 mod ops;
-//mod coerce;
 
 ///////////////////////////////////////////////////////////////////
 // GenericPolyRing<T>
@@ -72,6 +66,62 @@ pub struct GenericPolyRing<T> {
         ))
     )]
     pub(crate) ctx: Rc<GenericPolyCtx<T>>,
+}
+
+impl<T: Ring> New<&GenericPoly<T>> for GenericPolyRing<T> {
+    #[inline]
+    fn new(&self, val: &GenericPoly<T>) -> GenericPoly<T> {
+        val.clone()
+    }
+}
+
+impl<T> New<&Poly<T>> for GenericPolyRing<T>
+where
+    T: IntoPolyRing<Inner=GenericPolyRing<T>>
+{
+    #[inline]
+    fn new(&self, val: &Poly<T>) -> GenericPoly<T> {
+        val.inner().clone()
+    }
+}
+
+impl<S, T, const CAP: usize> New<[S; CAP]> for GenericPolyRing<T>
+where
+    T: Ring + New<S>,
+{
+    fn new(&self, coeffs: [S; CAP]) -> GenericPoly<T> {
+        let mut res = self.zero();
+        for (i, x) in coeffs.into_iter().enumerate() {
+            res.set_coeff(i, self.base_ring().new(x));
+        }
+        res
+    }
+}
+
+impl<'a, S, T> New<&'a [S]> for GenericPolyRing<T>
+where
+    T: Ring + New<&'a S>,
+{
+    fn new(&self, coeffs: &'a [S]) -> GenericPoly<T> {
+        let mut res = self.zero();
+        for (i, x) in coeffs.iter().enumerate() {
+            res.set_coeff(i, self.base_ring().new(x));
+        }
+        res
+    }
+}
+
+impl<S, T> New<Vec<S>> for GenericPolyRing<T> 
+where
+    T: Ring<Element=S>
+{
+    #[inline]
+    fn new(&self, coeffs: Vec<S>) -> GenericPoly<T> {
+        GenericPoly {
+            coeffs,
+            ctx: Rc::clone(&self.ctx),
+        }
+    }
 }
 
 impl<T: Ring + fmt::Display> fmt::Display for GenericPolyRing<T> {
@@ -118,7 +168,9 @@ impl<T: Ring> Identity<Additive> for GenericPolyRing<T> {
 }
 
 impl<T: Ring> Divisible<Additive> for GenericPolyRing<T> {}
+
 impl<T: Ring> Associative<Additive> for GenericPolyRing<T> {}
+
 impl<T: Ring> Commutative<Additive> for GenericPolyRing<T> {}
 
 impl<T: Ring> Identity<Multiplicative> for GenericPolyRing<T> {
@@ -132,6 +184,7 @@ impl<T: Ring> Identity<Multiplicative> for GenericPolyRing<T> {
 }
 
 impl<T: Ring> Associative<Multiplicative> for GenericPolyRing<T> {}
+
 impl<T: Ring> Commutative<Multiplicative> for GenericPolyRing<T> {}
 
 impl<T: Ring> Distributive for GenericPolyRing<T> {}
@@ -163,62 +216,6 @@ impl<T: Ring> PolynomialRing<T> for GenericPolyRing<T> {
     
     #[inline]
     fn is_generic(&self) -> bool { true }
-}
-
-impl<T: Ring> New<&GenericPoly<T>> for GenericPolyRing<T> {
-    #[inline]
-    fn new(&self, val: &GenericPoly<T>) -> GenericPoly<T> {
-        val.clone()
-    }
-}
-
-impl<T> New<&Poly<T>> for GenericPolyRing<T>
-where
-    T: PolyableRing<InnerPolyRing=GenericPolyRing<T>>
-{
-    #[inline]
-    fn new(&self, val: &Poly<T>) -> GenericPoly<T> {
-        val.inner().clone()
-    }
-}
-
-impl<S, T, const CAP: usize> New<[S; CAP]> for GenericPolyRing<T>
-where
-    T: Ring + New<S>,
-{
-    fn new(&self, coeffs: [S; CAP]) -> GenericPoly<T> {
-        let mut res = self.zero();
-        for (i, x) in coeffs.into_iter().enumerate() {
-            res.set_coeff(i, self.base_ring().new(x));
-        }
-        res
-    }
-}
-
-impl<'a, S, T> New<&'a [S]> for GenericPolyRing<T>
-where
-    T: Ring + New<&'a S>,
-{
-    fn new(&self, coeffs: &'a [S]) -> GenericPoly<T> {
-        let mut res = self.zero();
-        for (i, x) in coeffs.iter().enumerate() {
-            res.set_coeff(i, self.base_ring().new(x));
-        }
-        res
-    }
-}
-
-impl<S, T> New<Vec<S>> for GenericPolyRing<T> 
-where
-    T: Ring<Element=S>
-{
-    #[inline]
-    fn new(&self, coeffs: Vec<S>) -> GenericPoly<T> {
-        GenericPoly {
-            coeffs,
-            ctx: Rc::clone(&self.ctx),
-        }
-    }
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -374,6 +371,9 @@ impl<T: Ring> IsIdentity<Multiplicative> for GenericPoly<T> {
 
 impl<T: Ring> PolynomialRingElement<T> for GenericPoly<T> {
     type Parent = GenericPolyRing<T>;
+
+    type Borrow<'a> = &'a Elem<T> where T: 'a; 
+    type BorrowMut<'a> = &'a mut Elem<T> where T: 'a;
 
     #[inline]
     fn base_ring(&self) -> &T {

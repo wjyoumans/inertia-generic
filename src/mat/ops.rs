@@ -16,23 +16,22 @@
  */
 
 use inertia_algebra::ops::*;
-use crate::poly::*;
-
+use crate::mat::*;
 
 derive_unop! {
-    Poly<T: IntoPolyRing>, InnerPoly<T>;
+    Mat<T: IntoMatSpace>, InnerMat<T>;
     Neg, neg
     NegAssign, neg_assign
 }
 
 derive_unop! {
-    Poly<T: IntoPolyRing>, InnerPoly<T>;
+    Mat<T: IntoMatSpace>, InnerMat<T>;
     Inv, inv
     InvAssign, inv_assign
 }
 
 derive_binop! {
-    Poly<T: IntoPolyRing>, InnerPoly<T>;
+    Mat<T: IntoMatSpace>, InnerMat<T>;
     Add, add
     AddAssign, add_assign
     AddFrom, add_from
@@ -40,7 +39,7 @@ derive_binop! {
 }
 
 derive_binop! {
-    Poly<T: IntoPolyRing>, InnerPoly<T>;
+    Mat<T: IntoMatSpace>, InnerMat<T>;
     Sub, sub
     SubAssign, sub_assign
     SubFrom, sub_from
@@ -48,7 +47,7 @@ derive_binop! {
 }
 
 derive_binop! {
-    Poly<T: IntoPolyRing>, InnerPoly<T>;
+    Mat<T: IntoMatSpace>, InnerMat<T>;
     Mul, mul
     MulAssign, mul_assign
     MulFrom, mul_from
@@ -56,7 +55,7 @@ derive_binop! {
 }
 
 derive_binop! {
-    Poly<T: IntoPolyRing>, InnerPoly<T>;
+    Mat<T: IntoMatSpace>, InnerMat<T>;
     Div, div
     DivAssign, div_assign
     DivFrom, div_from
@@ -64,7 +63,7 @@ derive_binop! {
 }
 
 derive_binop! {
-    Poly<T: IntoPolyRing>, InnerPoly<T>;
+    Mat<T: IntoMatSpace>, InnerMat<T>;
     Rem, rem
     RemAssign, rem_assign
     RemFrom, rem_from

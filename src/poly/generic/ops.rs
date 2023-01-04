@@ -21,7 +21,6 @@ use inertia_algebra::ops::*;
 
 use crate::poly::{PolynomialRingElement, generic::GenericPoly};
 
-
 // Neg
 impl<T: Ring> NegAssign for GenericPoly<T> {
     #[inline]

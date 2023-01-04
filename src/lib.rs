@@ -19,6 +19,7 @@
 mod macros;
 
 pub mod poly;
+pub mod mat;
 
 use inertia_algebra::structures::Parent;
 

@@ -21,20 +21,22 @@ macro_rules! derive_unop {
         $op:ident, $meth:ident
         $op_assign:ident, $meth_assign:ident
     ) => {
-        impl<T: $bound> $op for $ident<T> {
+        impl<T: $bound> $op for $ident<T>
+        where
+            $inner<T>: $op<Output=$inner<T>>
+        {
             type Output = $ident<T>;
-            fn $meth(mut self) -> Self {
-                /*
+            fn $meth(self) -> Self {
                 $ident { 
-                    inner: self.into_inner().neg()
+                    inner: self.into_inner().$meth()
                 }
-                */
-                self.inner_mut().$meth_assign();
-                self
             }
         }
 
-        impl<T: $bound> $op_assign for $ident<T> {
+        impl<T: $bound> $op_assign for $ident<T> 
+        where
+            $inner<T>: $op_assign
+        {
             #[inline]
             fn $meth_assign(&mut self) {
                 self.inner_mut().$meth_assign();
@@ -43,12 +45,12 @@ macro_rules! derive_unop {
     }
 }
 
-// derive binops for wrapper type assuming wrapped type implements 
-// all combinations of ops. I.e. derive Add for Poly using Add impl for
-// GenericPoly.
+// Derive binary ops 1:1 with inner type. Use where clauses since the inertia_algebra
+// trait bounds may not require structures to implement all combinations of ops.
 //
-// Want to just derive Op<A> for B wherever Inner<B>: Op<Inner<A>> but
-// was getting recursion in checking predicates, so just derive all from 
+// Also, for example this allows deriving Div for Poly if an inner polynomial type
+// implements Div (perhaps panicking if not exact, or dropping remainder, etc)
+// even though its ordinarily not defined
 macro_rules! derive_binop {
     (
         $ident:ident< $gen:ident: $bound:ident>, $inner:ident<$_:ident>;
@@ -58,21 +60,19 @@ macro_rules! derive_binop {
         $assign_op:ident, $assign_meth:ident
     ) => {
        
-        /*
         impl<T: $bound> $op_assign for $ident<T>
-        //where
-        //    $inner<T>: $op_assign
+        where
+            $inner<T>: $op_assign
         {
             #[inline]
             fn $meth_assign(&mut self, rhs: Self) {
                 self.inner_mut().$meth_assign(rhs.into_inner());
             }
         }
-        */
         
         impl<'a, T: $bound> $op_assign<&'a $ident<T>> for $ident<T>
-        //where
-        //    $inner<T>: $op_assign<&'a $inner<T>>,
+        where
+            $inner<T>: $op_assign<&'a $inner<T>>,
         {
             #[inline]
             fn $meth_assign(&mut self, rhs: &'a $ident<T>) {
@@ -80,21 +80,19 @@ macro_rules! derive_binop {
             }
         }
         
-        /*
         impl<T: $bound> $op_from for $ident<T>
-        //where
-        //    $inner<T>: $op_from
+        where
+            $inner<T>: $op_from
         {
             #[inline]
             fn $meth_from(&mut self, lhs: Self) {
                 self.inner_mut().$meth_from(lhs.into_inner());
             }
         }
-        */
         
         impl<'a, T: $bound> $op_from<&'a $ident<T>> for $ident<T>
-        //where
-        //    $inner<T>: $op_from<&'a $inner<T>>,
+        where
+            $inner<T>: $op_from<&'a $inner<T>>,
         {
             #[inline]
             fn $meth_from(&mut self, lhs: &'a $ident<T>) {
@@ -102,44 +100,57 @@ macro_rules! derive_binop {
             }
         }
         
-        impl<T: $bound> $op for $ident<T> {
+        impl<T: $bound> $op for $ident<T> 
+        where
+            $inner<T>: $op<Output=$inner<T>>
+        {
             type Output = $ident<T>;
             #[inline]
-            fn $meth(mut self, rhs: Self) -> Self::Output {
-                self.$meth_assign(&rhs);
-                self
+            fn $meth(self, rhs: Self) -> Self::Output {
+                $ident {
+                    inner: self.into_inner().$meth(rhs.into_inner())
+                }
             }
         }
 
-        /*
-        impl<T: $bound> $op<&$ident<T>> for $ident<T> {
+        impl<'a, T: $bound> $op<&'a $ident<T>> for $ident<T>
+        where
+            $inner<T>: $op<&'a $inner<T>, Output=$inner<T>>
+        {
             type Output = $ident<T>;
             #[inline]
-            fn $meth(mut self, rhs: &Self) -> Self::Output {
-                self.$meth_assign(rhs);
-                self
+            fn $meth(self, rhs: &'a Self) -> Self::Output {
+                $ident {
+                    inner: self.into_inner().$meth(rhs.inner())
+                }
             }
         }
         
-        impl<T: $bound> $op<$ident<T>> for &$ident<T> {
+        impl<'a, T: $bound> $op<$ident<T>> for &'a $ident<T>
+        where
+            &'a $inner<T>: $op<$inner<T>, Output=$inner<T>>
+        {
             type Output = $ident<T>;
             #[inline]
-            fn $meth(self, mut rhs: $ident<T>) -> Self::Output {
-                rhs.$meth_from(self);
-                rhs
+            fn $meth(self, rhs: $ident<T>) -> Self::Output {
+                $ident {
+                    inner: self.inner().$meth(rhs.into_inner())
+                }
             }
         }
         
-        impl<T: $bound> $op<&$ident<T>> for &$ident<T> {
+        impl<'a, 'b, T: $bound> $op<&'b $ident<T>> for &'a $ident<T>
+        where
+            &'a $inner<T>: $op<&'b $inner<T>, Output=$inner<T>>
+        {
             type Output = $ident<T>;
             #[inline]
-            fn $meth(self, rhs: &$ident<T>) -> Self::Output {
-                let mut res = self.clone();
-                res.$meth_assign(rhs);
-                res
+            fn $meth(self, rhs: &'b $ident<T>) -> Self::Output {
+                $ident {
+                    inner: self.inner().$meth(rhs.inner())
+                }
             }
         }
-        */
 
         /*
         impl<T: $bound> $op_assign<OwnedElement<Elem<T>>> for $ident<T>
@@ -420,3 +431,243 @@ macro_rules! forward_binop {
     */
     }
 }
+
+/* OLD, DELETE
+// derive binops for wrapper type assuming wrapped type implements 
+// all combinations of ops. I.e. derive Add for Poly using Add impl for
+// GenericPoly.
+//
+// Want to just derive Op<A> for B wherever Inner<B>: Op<Inner<A>> but
+// was getting recursion in checking predicates, so just derive all from 
+macro_rules! derive_binop {
+    (
+        $ident:ident< $gen:ident: $bound:ident>, $inner:ident<$_:ident>;
+        $op:ident, $meth:ident
+        $op_assign:ident, $meth_assign:ident
+        $op_from:ident, $meth_from:ident
+        $assign_op:ident, $assign_meth:ident
+    ) => {
+       
+        /*
+        impl<T: $bound> $op_assign for $ident<T>
+        //where
+        //    $inner<T>: $op_assign
+        {
+            #[inline]
+            fn $meth_assign(&mut self, rhs: Self) {
+                self.inner_mut().$meth_assign(rhs.into_inner());
+            }
+        }
+        */
+        
+        impl<'a, T: $bound> $op_assign<&'a $ident<T>> for $ident<T>
+        //where
+        //    $inner<T>: $op_assign<&'a $inner<T>>,
+        {
+            #[inline]
+            fn $meth_assign(&mut self, rhs: &'a $ident<T>) {
+                self.inner_mut().$meth_assign(rhs.inner());
+            }
+        }
+        
+        /*
+        impl<T: $bound> $op_from for $ident<T>
+        //where
+        //    $inner<T>: $op_from
+        {
+            #[inline]
+            fn $meth_from(&mut self, lhs: Self) {
+                self.inner_mut().$meth_from(lhs.into_inner());
+            }
+        }
+        */
+        
+        impl<'a, T: $bound> $op_from<&'a $ident<T>> for $ident<T>
+        //where
+        //    $inner<T>: $op_from<&'a $inner<T>>,
+        {
+            #[inline]
+            fn $meth_from(&mut self, lhs: &'a $ident<T>) {
+                self.inner_mut().$meth_from(lhs.inner());
+            }
+        }
+        
+        impl<T: $bound> $op for $ident<T> {
+            type Output = $ident<T>;
+            #[inline]
+            fn $meth(mut self, rhs: Self) -> Self::Output {
+                self.$meth_assign(&rhs);
+                self
+            }
+        }
+
+        /*
+        impl<T: $bound> $op<&$ident<T>> for $ident<T> {
+            type Output = $ident<T>;
+            #[inline]
+            fn $meth(mut self, rhs: &Self) -> Self::Output {
+                self.$meth_assign(rhs);
+                self
+            }
+        }
+        
+        impl<T: $bound> $op<$ident<T>> for &$ident<T> {
+            type Output = $ident<T>;
+            #[inline]
+            fn $meth(self, mut rhs: $ident<T>) -> Self::Output {
+                rhs.$meth_from(self);
+                rhs
+            }
+        }
+        
+        impl<T: $bound> $op<&$ident<T>> for &$ident<T> {
+            type Output = $ident<T>;
+            #[inline]
+            fn $meth(self, rhs: &$ident<T>) -> Self::Output {
+                let mut res = self.clone();
+                res.$meth_assign(rhs);
+                res
+            }
+        }
+        */
+
+        /*
+        impl<T: $bound> $op_assign<OwnedElement<Elem<T>>> for $ident<T>
+        where
+            $inner<T>: $op_assign<OwnedElement<Elem<T>>>,
+        {
+            #[inline]
+            fn $meth_assign(&mut self, rhs: OwnedElement<Elem<T>>) {
+                self.inner_mut().$meth_assign(rhs);
+            }
+        }
+        
+        impl<'a, T: $bound> $op_assign<BorrowedElement<'a, Elem<T>>> for $ident<T>
+        where
+            $inner<T>: $op_assign<BorrowedElement<'a, Elem<T>>>,
+        {
+            #[inline]
+            fn $meth_assign(&mut self, rhs: BorrowedElement<'a, Elem<T>>) {
+                self.inner_mut().$meth_assign(rhs);
+            }
+        }
+        
+        impl<T: $bound> $op_from<OwnedElement<Elem<T>>> for $ident<T>
+        where
+            $inner<T>: $op_from<OwnedElement<Elem<T>>>,
+        {
+            #[inline]
+            fn $meth_from(&mut self, lhs: OwnedElement<Elem<T>>) {
+                self.inner_mut().$meth_from(lhs);
+            }
+        }
+        
+        impl<'a, T: $bound> $op_from<BorrowedElement<'a, Elem<T>>> for $ident<T>
+        where
+            $inner<T>: $op_from<BorrowedElement<'a, Elem<T>>>,
+        {
+            #[inline]
+            fn $meth_from(&mut self, lhs: BorrowedElement<'a, Elem<T>>) {
+                self.inner_mut().$meth_from(lhs);
+            }
+        }
+
+        impl<T: $bound> $op<OwnedElement<Elem<T>>> for $ident<T>
+        where
+            $inner<T>: $op_assign<OwnedElement<Elem<T>>>,
+        {
+            type Output = $ident<T>;
+            fn $meth(mut self, rhs: OwnedElement<Elem<T>>) -> Self::Output {
+                self.$meth_assign(rhs);
+                self
+            }
+        }
+        
+        impl<'a, T: $bound> $op<BorrowedElement<'a, Elem<T>>> for $ident<T>
+        where
+            $inner<T>: $op_assign<BorrowedElement<'a, Elem<T>>>,
+        {
+            type Output = $ident<T>;
+            fn $meth(mut self, rhs: BorrowedElement<'a, Elem<T>>) -> Self::Output {
+                self.$meth_assign(rhs);
+                self
+            }
+        }
+        
+        impl<T: $bound> $op<OwnedElement<Elem<T>>> for &$ident<T>
+        where
+            $inner<T>: $op_assign<OwnedElement<Elem<T>>>,
+        {
+            type Output = $ident<T>;
+            fn $meth(self, rhs: OwnedElement<Elem<T>>) -> Self::Output {
+                let mut res = self.clone();
+                res.$meth_assign(rhs);
+                res
+            }
+        }
+        
+        impl<'a, T: $bound> $op<BorrowedElement<'a, Elem<T>>> for &$ident<T>
+        where
+            $inner<T>: $op_assign<BorrowedElement<'a, Elem<T>>>,
+        {
+            type Output = $ident<T>;
+            fn $meth(self, rhs: BorrowedElement<'a, Elem<T>>) -> Self::Output {
+                let mut res = self.clone();
+                res.$meth_assign(rhs);
+                res
+            }
+        }
+
+        impl<T: $bound> $op<$ident<T>> for OwnedElement<Elem<T>>
+        where
+            $inner<T>: $op_from<OwnedElement<Elem<T>>>
+        {
+            type Output = $ident<T>;
+            #[inline]
+            fn $meth(self, mut rhs: $ident<T>) -> Self::Output {
+                rhs.$meth_from(self);
+                rhs
+            }
+        }
+        
+        impl<'a, T: $bound> $op<$ident<T>> for BorrowedElement<'a, Elem<T>>
+        where
+            $inner<T>: $op_from<BorrowedElement<'a, Elem<T>>>
+        {
+            type Output = $ident<T>;
+            #[inline]
+            fn $meth(self, mut rhs: $ident<T>) -> Self::Output {
+                rhs.$meth_from(self);
+                rhs
+            }
+        }
+        
+        impl<T: $bound> $op<&$ident<T>> for OwnedElement<Elem<T>>
+        where
+            $inner<T>: $op_from<OwnedElement<Elem<T>>>
+        {
+            type Output = $ident<T>;
+            #[inline]
+            fn $meth(self, rhs: &$ident<T>) -> Self::Output {
+                let mut res = rhs.clone();
+                res.$meth_from(self);
+                res
+            }
+        }
+        
+        impl<'a, T: $bound> $op<&$ident<T>> for BorrowedElement<'a, Elem<T>> 
+        where
+            $inner<T>: $op_from<BorrowedElement<'a, Elem<T>>>
+        {
+            type Output = $ident<T>;
+            #[inline]
+            fn $meth(self, rhs: &$ident<T>) -> Self::Output {
+                let mut res = rhs.clone();
+                res.$meth_from(self);
+                res
+            }
+        }
+        */
+    }
+}
+*/

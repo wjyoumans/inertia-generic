@@ -17,13 +17,11 @@
 
 
 pub mod generic;
-//mod coerce;
 mod ops;
 
 use crate::New;
-
 use inertia_algebra::*;
-
+use inertia_algebra::ops::{Deref, DerefMut};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
@@ -31,14 +29,13 @@ use std::hash::{Hash, Hasher};
 use serde::{Serialize, Deserialize};
 
 
-pub type InnerPolyRing<T> = <T as PolyableRing>::InnerPolyRing;
-pub type InnerPoly<T> = <InnerPolyRing<T> as PolynomialRing<T>>::Element;
-
-pub trait PolyableRing: Ring + Sized {
-    type InnerPolyRing: PolynomialRing<Self> + Clone; 
+pub trait IntoPolyRing: Ring + Sized {
+    type Inner: PolynomialRing<Self>; 
 }
 
-// Eventually move to inertia_algebra
+pub type InnerPolyRing<T> = <T as IntoPolyRing>::Inner;
+pub type InnerPoly<T> = <InnerPolyRing<T> as PolynomialRing<T>>::Element;
+
 pub trait PolynomialRing<T: Ring>:
     Ring<Element=<Self as PolynomialRing<T>>::Element>
 {
@@ -71,9 +68,9 @@ pub trait PolynomialRingElement<T: Ring>:
     RingElement<Parent=<Self as PolynomialRingElement<T>>::Parent>
 {
     type Parent: PolynomialRing<T, Element=Self>;
-
-    //type BorrowCoeff<'a>: Deref<Target=T>;
-    //type BorrowCoeffMut<'a>: DerefMut<Target=T>;
+    
+    type Borrow<'a>: Deref<Target=Elem<T>> where T: 'a;
+    type BorrowMut<'a>: DerefMut<Target=Elem<T>> where T: 'a;
     
     //fn parent(&self) -> <Self as PolynomialRingElement<T>>::Parent;
 
@@ -126,7 +123,7 @@ pub trait PolynomialRingElement<T: Ring>:
 //#[derive(Clone, Debug)]
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct PolyRing<T: PolyableRing> {
+pub struct PolyRing<T: IntoPolyRing> {
     #[cfg_attr(
         feature = "serde",
         serde(bound(
@@ -137,7 +134,36 @@ pub struct PolyRing<T: PolyableRing> {
     pub(crate) inner: InnerPolyRing<T>,
 }
 
-impl<T: PolyableRing> fmt::Display for PolyRing<T> where
+impl<T: IntoPolyRing> PolyRing<T> {
+    #[inline]
+    pub fn inner(&self) -> &InnerPolyRing<T> {
+        &self.inner
+    }
+
+    #[inline]
+    pub fn inner_mut(&mut self) -> &mut InnerPolyRing<T> {
+        &mut self.inner
+    }
+
+    #[inline]
+    pub fn into_inner(self) -> InnerPolyRing<T> {
+        self.inner
+    }
+}
+
+impl<S, T: IntoPolyRing> New<S> for PolyRing<T>
+where
+    InnerPolyRing<T>: New<S>
+{
+    #[inline]
+    fn new(&self, val: S) -> Poly<T> {
+        Poly {
+            inner: self.inner().new(val)
+        }
+    }
+}
+
+impl<T: IntoPolyRing> fmt::Display for PolyRing<T> where
     InnerPolyRing<T>: fmt::Display
 {
     #[inline]
@@ -146,9 +172,9 @@ impl<T: PolyableRing> fmt::Display for PolyRing<T> where
     }
 }
 
-impl<T: PolyableRing> Eq for PolyRing<T> where InnerPolyRing<T>: Eq {}
+impl<T: IntoPolyRing> Eq for PolyRing<T> where InnerPolyRing<T>: Eq {}
 
-impl<T: PolyableRing> PartialEq for PolyRing<T> 
+impl<T: IntoPolyRing> PartialEq for PolyRing<T> 
 where 
     InnerPolyRing<T>: PartialEq 
 {
@@ -158,7 +184,7 @@ where
     }
 }
 
-impl<T: PolyableRing> Hash for PolyRing<T> 
+impl<T: IntoPolyRing> Hash for PolyRing<T> 
 where
     InnerPolyRing<T>: Hash
 {
@@ -168,11 +194,11 @@ where
     }
 }
 
-impl<T: PolyableRing> Parent for PolyRing<T> {
+impl<T: IntoPolyRing> Parent for PolyRing<T> {
     type Element = Poly<T>;
 }
 
-impl<T: PolyableRing> Identity<Additive> for PolyRing<T> {
+impl<T: IntoPolyRing> Identity<Additive> for PolyRing<T> {
     #[inline]
     fn identity(&self) -> Poly<T> {
         Poly {
@@ -181,11 +207,13 @@ impl<T: PolyableRing> Identity<Additive> for PolyRing<T> {
     }
 }
 
-impl<T: PolyableRing> Divisible<Additive> for PolyRing<T> {}
-impl<T: PolyableRing> Associative<Additive> for PolyRing<T> {}
-impl<T: PolyableRing> Commutative<Additive> for PolyRing<T> {}
+impl<T: IntoPolyRing> Divisible<Additive> for PolyRing<T> {}
 
-impl<T: PolyableRing> Identity<Multiplicative> for PolyRing<T> {
+impl<T: IntoPolyRing> Associative<Additive> for PolyRing<T> {}
+
+impl<T: IntoPolyRing> Commutative<Additive> for PolyRing<T> {}
+
+impl<T: IntoPolyRing> Identity<Multiplicative> for PolyRing<T> {
     #[inline]
     fn identity(&self) -> Poly<T> {
         Poly {
@@ -194,12 +222,13 @@ impl<T: PolyableRing> Identity<Multiplicative> for PolyRing<T> {
     }
 }
 
-impl<T: PolyableRing> Associative<Multiplicative> for PolyRing<T> {}
-impl<T: PolyableRing> Commutative<Multiplicative> for PolyRing<T> {}
+impl<T: IntoPolyRing> Associative<Multiplicative> for PolyRing<T> {}
 
-impl<T: PolyableRing> Distributive for PolyRing<T> {}
+impl<T: IntoPolyRing> Commutative<Multiplicative> for PolyRing<T> {}
 
-impl<T: PolyableRing> PolynomialRing<T> for PolyRing<T> {
+impl<T: IntoPolyRing> Distributive for PolyRing<T> {}
+
+impl<T: IntoPolyRing> PolynomialRing<T> for PolyRing<T> {
     type Element = Poly<T>;
 
     #[inline]
@@ -230,35 +259,6 @@ impl<T: PolyableRing> PolynomialRing<T> for PolyRing<T> {
     }
 }
 
-impl<T: PolyableRing> PolyRing<T> {
-    #[inline]
-    pub fn inner(&self) -> &InnerPolyRing<T> {
-        &self.inner
-    }
-
-    #[inline]
-    pub fn inner_mut(&mut self) -> &mut InnerPolyRing<T> {
-        &mut self.inner
-    }
-
-    #[inline]
-    pub fn into_inner(self) -> InnerPolyRing<T> {
-        self.inner
-    }
-}
-
-impl<S, T: PolyableRing> New<S> for PolyRing<T>
-where
-    InnerPolyRing<T>: New<S>
-{
-    #[inline]
-    fn new(&self, val: S) -> Poly<T> {
-        Poly {
-            inner: self.inner().new(val)
-        }
-    }
-}
-
 
 ///////////////////////////////////////////////////////////////////
 // Poly<T>
@@ -267,7 +267,7 @@ where
 //#[derive(Clone, Debug)]
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct Poly<T: PolyableRing> {
+pub struct Poly<T: IntoPolyRing> {
     #[cfg_attr(
         feature = "serde",
         serde(bound(
@@ -278,7 +278,56 @@ pub struct Poly<T: PolyableRing> {
     pub(crate) inner: InnerPoly<T>,
 }
 
-impl<T: PolyableRing> fmt::Display for Poly<T>
+impl<T: IntoPolyRing> Poly<T> {
+    #[inline]
+    pub fn inner(&self) -> &InnerPoly<T> {
+        &self.inner
+    }
+
+    #[inline]
+    pub fn inner_mut(&mut self) -> &mut InnerPoly<T> {
+        &mut self.inner
+    }
+
+    #[inline]
+    pub fn into_inner(self) -> InnerPoly<T> {
+        self.inner
+    }
+    
+    /*
+    #[inline]
+    fn coeff(&self, i: usize) -> Option<&T> {
+        self.inner().coeff(i)
+    }
+
+    #[inline]
+    fn coeff_mut(&mut self, i: usize) -> &mut T {
+        self.inner_mut().coeff_mut(i)
+    }
+
+    #[inline]
+    fn coefficients(&self) -> &Vec<T> {
+        self.inner().coefficients()
+    }
+    
+    #[inline]
+    fn into_coefficients(self) -> Vec<T> {
+        self.into_inner().into_coefficients()
+    }
+
+    #[inline]
+    fn coefficients_mut(&mut self) -> &mut Vec<T> {
+        self.inner_mut().coefficients_mut()
+    }
+
+    #[inline]
+    fn set_coeff(&mut self, i: usize, coeff: T) -> T {
+        self.inner_mut().set_coeff(i, coeff)
+    }
+    */
+}
+
+impl<T: IntoPolyRing> fmt::Display for Poly<T>
 where
     InnerPoly<T>: fmt::Display,
 {
@@ -288,9 +337,9 @@ where
     }
 }
 
-impl<T: PolyableRing> Eq for Poly<T> {}
+impl<T: IntoPolyRing> Eq for Poly<T> {}
 
-impl<S: PolyableRing, T: PolyableRing> PartialEq<Poly<S>> for Poly<T>
+impl<S: IntoPolyRing, T: IntoPolyRing> PartialEq<Poly<S>> for Poly<T>
 where
     InnerPoly<T>: PartialEq<InnerPoly<S>>,
 {
@@ -300,7 +349,7 @@ where
     }
 }
 
-impl<S: PolyableRing, T: PolyableRing> PartialEq<&Poly<S>> for Poly<T>
+impl<S: IntoPolyRing, T: IntoPolyRing> PartialEq<&Poly<S>> for Poly<T>
 where
     InnerPoly<T>: PartialEq<InnerPoly<S>>,
 {
@@ -310,7 +359,7 @@ where
     }
 }
 
-impl<S: PolyableRing, T: PolyableRing> PartialEq<Poly<S>> for &Poly<T>
+impl<S: IntoPolyRing, T: IntoPolyRing> PartialEq<Poly<S>> for &Poly<T>
 where
     InnerPoly<T>: PartialEq<InnerPoly<S>>,
 {
@@ -320,7 +369,7 @@ where
     }
 }
 
-impl<T: PolyableRing + Hash> Hash for Poly<T>
+impl<T: IntoPolyRing + Hash> Hash for Poly<T>
 where
     InnerPoly<T>: Hash,
 {
@@ -330,7 +379,7 @@ where
     }
 }
 
-impl<T: PolyableRing> Element for Poly<T> {
+impl<T: IntoPolyRing> Element for Poly<T> {
     type Parent = PolyRing<T>;
  
     #[inline]
@@ -341,7 +390,7 @@ impl<T: PolyableRing> Element for Poly<T> {
     }
 }
 
-impl<T: PolyableRing> Operation<Additive> for Poly<T> {
+impl<T: IntoPolyRing> Operation<Additive> for Poly<T> {
     #[inline]
     fn operate(&self, right: &Self) -> Self {
         Poly {
@@ -350,14 +399,14 @@ impl<T: PolyableRing> Operation<Additive> for Poly<T> {
     }
 }
 
-impl<T: PolyableRing> IsIdentity<Additive> for Poly<T> {
+impl<T: IntoPolyRing> IsIdentity<Additive> for Poly<T> {
     #[inline]
     fn is_identity(&self) -> bool {
         self.inner().is_zero()
     }
 }
 
-impl<T: PolyableRing> TwoSidedInverse<Additive> for Poly<T> {
+impl<T: IntoPolyRing> TwoSidedInverse<Additive> for Poly<T> {
     #[inline]
     fn two_sided_inverse(&self) -> Self {
         Poly {
@@ -366,7 +415,7 @@ impl<T: PolyableRing> TwoSidedInverse<Additive> for Poly<T> {
     }
 }
 
-impl<T: PolyableRing> Operation<Multiplicative> for Poly<T> {
+impl<T: IntoPolyRing> Operation<Multiplicative> for Poly<T> {
     #[inline]
     fn operate(&self, right: &Self) -> Self {
         Poly {
@@ -375,15 +424,18 @@ impl<T: PolyableRing> Operation<Multiplicative> for Poly<T> {
     }
 }
 
-impl<T: PolyableRing> IsIdentity<Multiplicative> for Poly<T> {
+impl<T: IntoPolyRing> IsIdentity<Multiplicative> for Poly<T> {
     #[inline]
     fn is_identity(&self) -> bool {
         self.inner().is_one()
     }
 }
 
-impl<T: PolyableRing> PolynomialRingElement<T> for Poly<T> {
+impl<T: IntoPolyRing> PolynomialRingElement<T> for Poly<T> {
     type Parent = PolyRing<T>;
+
+    type Borrow<'a> = &'a Elem<T> where T: 'a;
+    type BorrowMut<'a> = &'a mut Elem<T> where T: 'a;
 
     #[inline]
     fn base_ring(&self) -> &T {
@@ -421,53 +473,3 @@ impl<T: PolyableRing> PolynomialRingElement<T> for Poly<T> {
     }
 }
 
-impl<T: PolyableRing> Poly<T> {
-    #[inline]
-    pub fn inner(&self) -> &InnerPoly<T> {
-        &self.inner
-    }
-
-    #[inline]
-    pub fn inner_mut(&mut self) -> &mut InnerPoly<T> {
-        &mut self.inner
-    }
-
-    #[inline]
-    pub fn into_inner(self) -> InnerPoly<T> {
-        self.inner
-    }
-}
-
-/*
-impl<T: PolyableRing> Poly<T> {
-    #[inline]
-    fn coeff(&self, i: usize) -> Option<&T> {
-        self.inner().coeff(i)
-    }
-
-    #[inline]
-    fn coeff_mut(&mut self, i: usize) -> &mut T {
-        self.inner_mut().coeff_mut(i)
-    }
-
-    #[inline]
-    fn coefficients(&self) -> &Vec<T> {
-        self.inner().coefficients()
-    }
-    
-    #[inline]
-    fn into_coefficients(self) -> Vec<T> {
-        self.into_inner().into_coefficients()
-    }
-
-    #[inline]
-    fn coefficients_mut(&mut self) -> &mut Vec<T> {
-        self.inner_mut().coefficients_mut()
-    }
-
-    #[inline]
-    fn set_coeff(&mut self, i: usize, coeff: T) -> T {
-        self.inner_mut().set_coeff(i, coeff)
-    }
-
-}*/
