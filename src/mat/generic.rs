@@ -141,7 +141,13 @@ impl<T: Ring> MatrixSpace<T> for GenericMatSpace<T> {
     #[inline]
     fn init<D: Into<u64>>(base_ring: &T, nrows: D, ncols: D) -> Self {
         GenericMatSpace {
-            ctx: Rc::new(GenericMatCtx::new(base_ring.clone(), nrows.into(), ncols.into()))
+            ctx: Rc::new(
+                GenericMatCtx::new(
+                     base_ring.clone(), 
+                     nrows.into(), 
+                     ncols.into()
+                )
+            )
         }
     }
 

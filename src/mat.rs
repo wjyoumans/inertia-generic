@@ -178,19 +178,18 @@ impl<T: IntoMatSpace> Associative<Additive> for MatSpace<T> {}
 
 impl<T: IntoMatSpace> Commutative<Additive> for MatSpace<T> {}
 
-/*
 impl<T: IntoMatSpace> MatrixSpace<T> for MatSpace<T> {
     type Element = Mat<T>;
 
     #[inline]
-    fn new(ring: &BaseRing<T>, nrows: u32, ncols: u32) -> Self {
+    fn init<D: Into<u64>>(ring: &T, nrows: D, ncols: D) -> Self {
         MatSpace {
-            inner: InnerMatSpace::<T>::new(ring, nrows, ncols),
+            inner: InnerMatSpace::<T>::init(ring, nrows, ncols),
         }
     }
 
     #[inline]
-    fn base_ring(&self) -> &BaseRing<T> {
+    fn base_ring(&self) -> &T {
         self.inner().base_ring()
     }
 
@@ -209,7 +208,6 @@ impl<T: IntoMatSpace> MatrixSpace<T> for MatSpace<T> {
         self.inner().is_generic()
     }
 }
-*/
 
 ///////////////////////////////////////////////////////////////////
 // Mat<T>
@@ -330,12 +328,11 @@ impl<T: IntoMatSpace> TwoSidedInverse<Additive> for Mat<T> {
     }
 }
 
-/*
 impl<T: IntoMatSpace> MatrixSpaceElement<T> for Mat<T> {
     type Parent = MatSpace<T>;
 
     #[inline]
-    fn base_ring(&self) -> &BaseRing<T> {
+    fn base_ring(&self) -> &T {
         self.inner().base_ring()
     }
 
@@ -355,38 +352,43 @@ impl<T: IntoMatSpace> MatrixSpaceElement<T> for Mat<T> {
     }
 
     #[inline]
-    fn entry(&self, i: usize, j: usize) -> Option<&T> {
-        self.inner().entry(i, j)
+    fn get_entry(&self, i: usize, j: usize) -> Option<Elem<T>> {
+        self.inner().get_entry(i, j)
     }
 
+    /*
     #[inline]
     fn entry_mut(&mut self, i: usize, j: usize) -> Option<&mut T> {
         self.inner_mut().entry_mut(i, j)
     }
+    */
 
     #[inline]
-    fn set_entry(&mut self, i: usize, j: usize, entry: T) -> Option<T> {
+    fn set_entry(&mut self, i: usize, j: usize, entry: Elem<T>) -> Option<Elem<T>> {
         self.inner_mut().set_entry(i, j, entry)
     }
 
     #[inline]
-    fn entries(&self) -> &Vec<T> {
-        self.inner().entries()
+    fn get_entries(&self) -> Vec<Elem<T>> {
+        self.inner().get_entries()
     }
 
+    /*
     #[inline]
     fn entries_mut(&mut self) -> &mut Vec<T> {
         self.inner_mut().entries_mut()
     }
+    */
 
+    /*
     #[inline]
     fn into_entries(self) -> Vec<T> {
         self.into_inner().into_entries()
     }
+    */
 
     #[inline]
     fn is_generic(&self) -> bool {
         self.inner().is_generic()
     }
 }
-*/
