@@ -21,8 +21,3 @@ mod macros;
 pub mod poly;
 pub mod mat;
 
-use inertia_algebra::structures::Parent;
-
-pub trait New<T>: Parent {
-    fn new(&self, rhs: T) -> Self::Element;
-}

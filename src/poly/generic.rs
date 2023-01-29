@@ -68,14 +68,14 @@ pub struct GenericPolyRing<T> {
     pub(crate) ctx: Rc<GenericPolyCtx<T>>,
 }
 
-impl<T: Ring> New<&GenericPoly<T>> for GenericPolyRing<T> {
+impl<T: Ring> NewElement<&GenericPoly<T>> for GenericPolyRing<T> {
     #[inline]
     fn new(&self, val: &GenericPoly<T>) -> GenericPoly<T> {
         val.clone()
     }
 }
 
-impl<T> New<&Poly<T>> for GenericPolyRing<T>
+impl<T> NewElement<&Poly<T>> for GenericPolyRing<T>
 where
     T: IntoPolyRing<Inner=GenericPolyRing<T>>
 {
@@ -85,9 +85,9 @@ where
     }
 }
 
-impl<S, T, const CAP: usize> New<[S; CAP]> for GenericPolyRing<T>
+impl<S, T, const CAP: usize> NewElement<[S; CAP]> for GenericPolyRing<T>
 where
-    T: Ring + New<S>,
+    T: Ring + NewElement<S>,
 {
     fn new(&self, coeffs: [S; CAP]) -> GenericPoly<T> {
         let mut res = self.zero();
@@ -98,9 +98,9 @@ where
     }
 }
 
-impl<'a, S, T> New<&'a [S]> for GenericPolyRing<T>
+impl<'a, S, T> NewElement<&'a [S]> for GenericPolyRing<T>
 where
-    T: Ring + New<&'a S>,
+    T: Ring + NewElement<&'a S>,
 {
     fn new(&self, coeffs: &'a [S]) -> GenericPoly<T> {
         let mut res = self.zero();
@@ -111,7 +111,7 @@ where
     }
 }
 
-impl<S, T> New<Vec<S>> for GenericPolyRing<T> 
+impl<S, T> NewElement<Vec<S>> for GenericPolyRing<T> 
 where
     T: Ring<Element=S>
 {

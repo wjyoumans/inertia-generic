@@ -18,8 +18,8 @@
 pub mod generic;
 mod ops;
 
-use crate::New;
 use inertia_algebra::*;
+use inertia_algebra::ops::NewElement;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
@@ -116,9 +116,9 @@ impl<T: IntoMatSpace> MatSpace<T> {
     }
 }
 
-impl<S, T: IntoMatSpace> New<S> for MatSpace<T>
+impl<S, T: IntoMatSpace> NewElement<S> for MatSpace<T>
 where
-    InnerMatSpace<T>: New<S>
+    InnerMatSpace<T>: NewElement<S>
 {
     #[inline]
     fn new(&self, val: S) -> Mat<T> {

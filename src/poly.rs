@@ -19,9 +19,8 @@
 pub mod generic;
 mod ops;
 
-use crate::New;
 use inertia_algebra::*;
-use inertia_algebra::ops::{Deref, DerefMut};
+use inertia_algebra::ops::{Deref, DerefMut, NewElement};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
@@ -151,9 +150,9 @@ impl<T: IntoPolyRing> PolyRing<T> {
     }
 }
 
-impl<S, T: IntoPolyRing> New<S> for PolyRing<T>
+impl<S, T: IntoPolyRing> NewElement<S> for PolyRing<T>
 where
-    InnerPolyRing<T>: New<S>
+    InnerPolyRing<T>: NewElement<S>
 {
     #[inline]
     fn new(&self, val: S) -> Poly<T> {
@@ -325,6 +324,10 @@ impl<T: IntoPolyRing> Poly<T> {
         self.inner_mut().set_coeff(i, coeff)
     }
     */
+
+    pub fn from_raw(inner: InnerPoly<T>) -> Self {
+        Poly { inner }
+    }
 }
 
 impl<T: IntoPolyRing> fmt::Display for Poly<T>
