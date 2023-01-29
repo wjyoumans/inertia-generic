@@ -1,11 +1,7 @@
 use inertia_algebra::*;
 use inertia_algebra::ops::*;
-use inertia_algebra::structures::*;
-use inertia_algebra::properties::*;
 
-use inertia_generic::New;
 use inertia_generic::poly::*;
-use inertia_generic::poly::generic::GenericPolyRing;
 
 use std::fmt;
 use std::marker::PhantomData;
@@ -145,11 +141,7 @@ macro_rules! impl_poly {
             }
         }
 
-        impl PolyableRing for WrappingRing<$t> {
-            type InnerPolyRing = GenericPolyRing<Self>;
-        }
-
-        impl New<$t> for WrappingRing<$t> {
+        impl NewElement<$t> for WrappingRing<$t> {
             fn new(&self, src: $t) -> Wrap<$t> {
                 Wrap(src)
             }
@@ -170,7 +162,7 @@ impl_poly! { usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 }
 fn main() {
     let zn = WrappingRing::<i8>::init();
 
-    let znx = PolyRing::init(&zn, "x");
+    let znx = GenericPolyRing::init(&zn, "x");
     let f = znx.new([1, 0, 1]);
     let g = znx.new([3, 2, 1]);
     println!("f = {}", &f);

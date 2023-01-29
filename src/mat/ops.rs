@@ -15,57 +15,98 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+
+use inertia_algebra::structures::*;
 use inertia_algebra::ops::*;
-use crate::mat::*;
 
-derive_unop! {
-    Mat<T: IntoMatSpace>, InnerMat<T>;
-    Neg, neg
-    NegAssign, neg_assign
+use crate::mat::GenericMat;
+
+// Neg
+impl<T: Ring> NegAssign for GenericMat<T> {
+    #[inline]
+    fn neg_assign(&mut self) {
+        unimplemented!()
+    }
 }
 
-derive_unop! {
-    Mat<T: IntoMatSpace>, InnerMat<T>;
-    Inv, inv
-    InvAssign, inv_assign
+impl<T: Ring> Neg for GenericMat<T> {
+    type Output = GenericMat<T>;
+    #[inline]
+    fn neg(mut self) -> Self::Output {
+        self.neg_assign();
+        self
+    }
 }
 
-derive_binop! {
-    Mat<T: IntoMatSpace>, InnerMat<T>;
+impl<T: Ring> Neg for &GenericMat<T> {
+    type Output = GenericMat<T>;
+    #[inline]
+    fn neg(self) -> Self::Output {
+        let res = self.clone();
+        res.neg()
+    }
+}
+
+// Add
+impl<T: Ring> AddAssign<&GenericMat<T>> for GenericMat<T> {
+    fn add_assign(&mut self, _rhs: &GenericMat<T>) {
+        unimplemented!()
+    }
+}
+
+impl<T: Ring> AddFrom<&GenericMat<T>> for GenericMat<T> {
+    fn add_from(&mut self, _lhs: &GenericMat<T>) {
+        unimplemented!()
+    }
+}
+
+forward_binop! {
+    GenericMat<T: Ring>
     Add, add
     AddAssign, add_assign
     AddFrom, add_from
-    AssignAdd, assign_add
 }
 
-derive_binop! {
-    Mat<T: IntoMatSpace>, InnerMat<T>;
+// Sub
+
+impl<T: Ring> SubAssign<&Self> for GenericMat<T> {
+    fn sub_assign(&mut self, _rhs: &Self) {
+        unimplemented!()
+    }
+}
+
+impl<T: Ring> SubFrom<&Self> for GenericMat<T> {
+    fn sub_from(&mut self, _lhs: &Self) {
+        unimplemented!()
+    }
+}
+
+forward_binop! {
+    GenericMat<T: Ring>
     Sub, sub
     SubAssign, sub_assign
     SubFrom, sub_from
-    AssignSub, assign_sub
 }
 
-derive_binop! {
-    Mat<T: IntoMatSpace>, InnerMat<T>;
+/* TODO: op guard to check matrix dim
+// Mul
+
+impl<T: Ring> MulAssign<&Self> for GenericMat<T> {
+    fn mul_assign(&mut self, _rhs: &Self) {
+        unimplemented!()
+    }
+}
+
+impl<T: Ring> MulFrom<&Self> for GenericMat<T> {
+    fn mul_from(&mut self, _lhs: &Self) {
+        unimplemented!()
+    }
+}
+
+forward_binop! {
+    GenericMat<T: Ring>
     Mul, mul
     MulAssign, mul_assign
     MulFrom, mul_from
-    AssignMul, assign_mul
 }
-
-derive_binop! {
-    Mat<T: IntoMatSpace>, InnerMat<T>;
-    Div, div
-    DivAssign, div_assign
-    DivFrom, div_from
-    AssignDiv, assign_div
-}
-
-derive_binop! {
-    Mat<T: IntoMatSpace>, InnerMat<T>;
-    Rem, rem
-    RemAssign, rem_assign
-    RemFrom, rem_from
-    AssignRem, assign_rem
-}
+*/
